@@ -621,4 +621,27 @@ class User < ApplicationRecord
   def trigger_webhooks
     TriggerWebhookWorker.perform_async('account.created', 'Account', account_id)
   end
+
+  def set_user_type_from_email
+    if email.present?
+      self.user_type = if email.end_with?('@vnu.edu.vn')
+                         'student'
+                       elsif email.end_with?('@gmail.com')
+                         'guest'
+                       else
+                         'organization'
+                       end
+    end
+  end
+
+  def auto_join_organization_by_email_domain
+    return unless organization?
+
+    domain = email_domain
+    return if domain.blank?
+
+    org = Organization.find_by(email_domain: domain)
+
+    update(organization: org) if org
+  end
 end
