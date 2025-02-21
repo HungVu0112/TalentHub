@@ -17,6 +17,7 @@
 #  avatar_remote_url             :string
 
 class Organization < ApplicationRecord
+  include Organization::Avatar
   include DomainNormalizable
 
   NAME_LENGTH_LIMIT = 50
@@ -61,12 +62,42 @@ class Organization < ApplicationRecord
     organization
   end
 
+  def save_with_optional_media!
+    save!
+  rescue ActiveRecord::RecordInvalid => e
+    errors = e.record.errors.errors
+    errors.each do |err|
+      self.avatar = nil if err.attribute == :avatar
+    end
+
+    save!
+  end
+
+  def emojis
+    @emojis ||= CustomEmoji.from_text(emojifiable_text, nil)
+  end
+
+  def to_param
+    id.to_s
+  end
+
+  def to_log_human_identifier
+    name
+  end
 
   private
+
+  def normalize_domain
+    self.email_domain = email_domain.downcase if email_domain.present?
+  end
 
   def update_users_organization
     User.where('email LIKE ?', "%@#{email_domain}").find_each do |user|
       user.update(organization: self)
     end
+  end
+
+  def emojifiable_text
+    [name, description].join(' ')
   end
 end
