@@ -69,6 +69,12 @@ class Api::V1::OrganizationsController < Api::BaseController
     if @organization.destroy
   end
 
+  def members
+    @organization = Organization.find(params[:id])
+    @users = @organization.users.page(params[:page]).per(20)
+    render json: @users, each_serializer: REST::AccountSerializer
+  end
+
   private
 
   def set_organization
