@@ -65,8 +65,11 @@ class Api::V1::OrganizationsController < Api::BaseController
     # Remove organization association from all users
     @organization.users.update_all(organization_id: nil)
 
-    render json: { success: true }, status: 200
     if @organization.destroy
+      render json: { success: true }, status: 200
+    else
+      render json: { error: @organization.errors.full_messages.join(', ') }, status: 422
+    end
   end
 
   def members
@@ -86,6 +89,6 @@ class Api::V1::OrganizationsController < Api::BaseController
   end
 
   def check_organization_ownership
-    render json: { error: I18n.t('organization.errors.not_authorized') }, status: 403 unless current_user.organization? && current_user.organization_id == @organization.id
+    render json: { error: I18n.t('organizations.errors.not_authorized') }, status: 403 unless current_user.organization? && current_user.organization_id == @organization.id
   end
 end
