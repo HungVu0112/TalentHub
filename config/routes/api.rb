@@ -42,6 +42,19 @@ namespace :api, format: false do
       end
     end
 
+    resources :jobs do
+      collection do
+        get :my_jobs
+        get :saved_jobs
+        get :created_jobs
+      end
+
+      member do
+        post :save_job
+        delete :unsave_job
+      end
+    end
+    
     namespace :timelines do
       resource :home, only: :show, controller: :home
       resource :public, only: :show, controller: :public
