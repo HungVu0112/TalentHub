@@ -56,6 +56,12 @@ class Job < ApplicationRecord
   scope :by_organization, ->(org_id) { where(organization_id: org_id) }
   scope :by_job_type, ->(job_type) { where(job_type: job_type) if job_type.present? }
   scope :by_job_category, ->(job_category) { where(job_category: job_category) if job_category.present? }
+  scope :by_query, lambda { |query|
+    if query.present?
+      joins(:organization)
+        .where('jobs.title ILIKE :q OR jobs.description ILIKE :q OR organizations.name ILIKE :q', q: "%#{query}%")
+    end
+  }
   scope :deadline_approaching, lambda {
     where('deadline IS NOT NULL AND deadline > ? AND deadline < ?', Time.zone.now, 7.days.from_now)
   }
@@ -126,5 +132,22 @@ class Job < ApplicationRecord
 
   def set_default_status
     self.status ||= 'open'
+  end
+
+  def set_default_contact_email
+    self.contact_email ||= user.email
+  end
+
+  # def notify_organization_members
+  #   OrganizationMailer.new_job_posted(self).deliver_later
+  # end
+
+  def notify_status_change
+    if status_previously_changed?(from: 'open', to: 'closed')
+      # Notify applicants that the job was closed
+      job_applications.each do |application|
+        JobMailer.job_closed_notification(application).deliver_later
+      end
+    end
   end
 end
