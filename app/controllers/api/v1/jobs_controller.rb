@@ -45,6 +45,15 @@ class Api::V1::JobsController < Api::BaseController
     end
   end
 
+  def created_jobs
+    @jobs = Job.where(user_id: current_user.id)
+               .includes(:organization)
+               .recent
+               .page(params[:page])
+               .per(15)
+
+    render json: @jobs, each_serializer: REST::JobSerializer
+  end
 
   private
 
@@ -55,6 +64,36 @@ class Api::V1::JobsController < Api::BaseController
   def job_params
     params.permit(:title, :description, :requirements, :location,
                   :salary_range, :deadline, :status, :job_type, :contact_email, :job_category)
+  end
+
+  def filtered_jobs
+    jobs = Job.active.includes(:organization, :user)
+
+    # Apply filters
+    jobs = jobs.by_organization(params[:organization_id]) if params[:organization_id].present?
+    jobs = jobs.by_job_type(params[:job_type]) if params[:job_type].present?
+    jobs = jobs.by_job_category(params[:job_category]) if params[:job_category].present?
+    jobs = jobs.by_query(params[:q]) if params[:q].present?
+
+    # Sort options
+    case params[:sort]
+    when 'newest'
+      jobs.order(created_at: :desc)
+    when 'oldest'
+      jobs.order(created_at: :asc)
+    when 'deadline'
+      jobs.order('deadline IS NULL, deadline ASC')
+    else
+      jobs.order(created_at: :desc)
+    end
+  end
+
+  def check_job_ownership
+    render json: { error: I18n.t('jobs.errors.not_authorized') }, status: 403 unless current_user.organization_id == @job.organization_id
+  end
+
+  def check_can_post_job
+    render json: { error: I18n.t('jobs.errors.cannot_post') }, status: 403 unless current_user.can_post_job?
   end
 
   def check_can_save_job
