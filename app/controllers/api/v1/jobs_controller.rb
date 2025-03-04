@@ -45,6 +45,68 @@ class Api::V1::JobsController < Api::BaseController
     end
   end
 
+  def my_jobs
+    @jobs = Job.by_organization(current_user.organization_id).active.recent.page(params[:page]).per(15)
+    render json: @jobs, each_serializer: REST::JobSerializer
+  end
+
+  def saved_jobs
+    return render json: [], status: 200 if current_user.saved_jobs.blank?
+
+    job_ids = current_user.saved_jobs
+    @jobs = Job.where(id: job_ids).active.recent.page(params[:page]).per(15)
+    render json: @jobs, each_serializer: REST::JobSerializer
+  end
+
+  def save_job
+    current_user.saved_jobs ||= []
+    job_id_str = @job.id.to_s
+
+    if current_user.saved_jobs.include?(job_id_str)
+      render json: {
+        message: I18n.t('jobs.already_saved'),
+      }, status: 200
+    else
+      current_user.saved_jobs.push(job_id_str)
+
+      if current_user.save
+        render json: {
+          success: true,
+          message: I18n.t('jobs.saved_successfully'),
+        }, status: 200
+      else
+        render json: {
+          error: current_user.errors.full_messages.join(', '),
+        }, status: 422
+      end
+    end
+  end
+
+  def unsave_job
+    return render json: { error: I18n.t('jobs.no_saved_jobs') }, status: 400 if current_user.saved_jobs.nil?
+
+    job_id_str = @job.id.to_s
+
+    if current_user.saved_jobs.include?(job_id_str)
+      current_user.saved_jobs.delete(job_id_str)
+
+      if current_user.save
+        render json: {
+          success: true,
+          message: I18n.t('jobs.unsaved_successfully'),
+        }, status: 200
+      else
+        render json: {
+          error: current_user.errors.full_messages.join(', '),
+        }, status: 422
+      end
+    else
+      render json: {
+        message: I18n.t('jobs.not_in_saved_jobs'),
+      }, status: 200
+    end
+  end
+
   def created_jobs
     @jobs = Job.where(user_id: current_user.id)
                .includes(:organization)
