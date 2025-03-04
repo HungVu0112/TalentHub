@@ -26,7 +26,11 @@ class Api::V1::JobsController < Api::BaseController
     @job.user = current_user
     @job.organization = current_user.organization
 
-    render json: @job, serializer: REST::JobSerializer::Detailed, status: 201
+    if @job.save
+      render json: @job, serializer: REST::JobSerializer::Detailed, status: 201
+    else
+      render json: { error: @job.errors.full_messages.join(', ') }, status: 422
+    end
   end
 
   def update
