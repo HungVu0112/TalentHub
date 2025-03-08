@@ -117,3 +117,79 @@ export function normalizeAnnouncement(announcement) {
 
   return normalAnnouncement;
 }
+
+// Organization
+export function normalizeOrganization(organization, oldOrganization) {
+  const normalOrganization = { ...organization }
+
+  const emojiMap = makeEmojiMap(normalOrganization.emojis || []);
+  
+  if (!oldOrganization || 
+      oldOrganization.name !== normalOrganization.name || 
+      oldOrganization.description !== normalOrganization.description) {
+    
+    // Emoji and HTML processing for name and description
+    normalOrganization.nameHtml = emojify(
+      escapeTextContentForBrowser(normalOrganization.name), 
+      emojiMap
+    );
+    
+    normalOrganization.descriptionHtml = emojify(
+      escapeTextContentForBrowser(normalOrganization.description || ''), 
+      emojiMap
+    );
+  } else {
+    // Reuse existing HTML if content hasn't changed
+    normalOrganization.nameHtml = oldOrganization.nameHtml;
+    normalOrganization.descriptionHtml = oldOrganization.descriptionHtml;
+  }
+
+  // Avatar processing
+  if (normalOrganization.avatar) {
+    normalOrganization.avatarStatic = normalOrganization.avatar.static_url || normalOrganization.avatar.url;
+  }
+
+  return normalOrganization;
+}
+
+export function normalizeOrganizationList(organizations) {
+  return organizations.map(org => normalizeOrganization(org));
+}
+
+export function normalizeJob(job, oldJob) {
+  const normalJob = { ...job };
+
+  const emojiMap = makeEmojiMap(normalJob.emojis || []);
+  
+  if (!oldJob || 
+      oldJob.title !== normalJob.title || 
+      oldJob.description !== normalJob.description) {
+    
+    // Emoji and HTML processing for title and description
+    normalJob.titleHtml = emojify(
+      escapeTextContentForBrowser(normalJob.title), 
+      emojiMap
+    );
+    
+    normalJob.descriptionHtml = emojify(
+      escapeTextContentForBrowser(normalJob.description || ''), 
+      emojiMap
+    );
+
+    // Process requirements
+    normalJob.requirementsHtml = emojify(
+      escapeTextContentForBrowser(normalJob.requirements || ''), 
+      emojiMap
+    );
+  } else {
+    // Reuse existing HTML if content hasn't changed
+    normalJob.titleHtml = oldJob.titleHtml;
+    normalJob.descriptionHtml = oldJob.descriptionHtml;
+    normalJob.requirementsHtml = oldJob.requirementsHtml;
+  }
+
+}
+
+export function normalizeJobApplicationList(applications) {
+  return applications.map(application => normalizeJobApplication(application));
+}
