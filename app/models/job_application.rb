@@ -54,6 +54,9 @@ class JobApplication < ApplicationRecord
   scope :rejected, -> { where(status: 'rejected') }
   scope :withdrawn, -> { where(status: 'withdrawn') }
   scope :active, -> { where(status: %w(pending reviewing interviewed)) }
+  scope :by_job, ->(job_id) { where(job_id: job_id) }
+  scope :by_user, ->(user_id) { where(user_id: user_id) }
+  scope :recent, -> { order(created_at: :desc) }
 
   # Callbacks
   after_create :increment_application_count
