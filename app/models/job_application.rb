@@ -59,7 +59,9 @@ class JobApplication < ApplicationRecord
   scope :recent, -> { order(created_at: :desc) }
 
   # Callbacks
+  after_create :notify_job_poster
   after_create :increment_application_count
+  after_update :notify_status_change, if: :saved_change_to_status?
 
   # Instance methods
   def pending?
@@ -118,6 +120,23 @@ class JobApplication < ApplicationRecord
 
   def validate_one_application_per_job_per_user
     errors.add(:base, I18n.t('job_applications.errors.already_applied')) if JobApplication.exists?(user_id: user_id, job_id: job_id)
+  end
+
+  def notify_job_poster
+    JobMailer.new_application_notification(self).deliver_later
+  end
+
+  def notify_status_change
+    case status
+    when 'reviewing'
+      JobMailer.application_reviewing_notification(self).deliver_later
+    when 'interviewed'
+      JobMailer.application_interview_notification(self).deliver_later
+    when 'accepted'
+      JobMailer.application_accepted_notification(self).deliver_later
+    when 'rejected'
+      JobMailer.application_rejected_notification(self).deliver_later
+    end
   end
 
   def increment_application_count
