@@ -91,29 +91,92 @@ export const makeGetReport = () => createSelector([
   (state, _, targetAccountId) => state.getIn(['accounts', targetAccountId]),
 ], (base, targetAccount) => base.set('target_account', targetAccount));
 
-export const getAccountGallery = createSelector([
-  (state, id) => state.getIn(['timelines', `account:${id}:media`, 'items'], ImmutableList()),
-  state       => state.get('statuses'),
-  (state, id) => state.getIn(['accounts', id]),
-], (statusIds, statuses, account) => {
-  let medias = ImmutableList();
-
-  statusIds.forEach(statusId => {
-    const status = statuses.get(statusId).set('account', account);
-    medias = medias.concat(status.get('media_attachments').map(media => media.set('status', status)));
-  });
-
-  return medias;
-});
-
-export const getAccountHidden = createSelector([
-  (state, id) => state.getIn(['accounts', id, 'hidden']),
-  (state, id) => state.getIn(['relationships', id, 'following']) || state.getIn(['relationships', id, 'requested']),
-  (state, id) => id === me,
-], (hidden, followingOrRequested, isSelf) => {
-  return hidden && !(isSelf || followingOrRequested);
-});
-
 export const getStatusList = createSelector([
   (state, type) => state.getIn(['status_lists', type, 'items']),
 ], (items) => items.toList());
+
+export const getOrganization = createSelector(
+  [(state, { org_id }) => state.getIn(['organizations', org_id])],
+  (organization) => organization
+);
+
+export const makeGetOrganization = () => {
+  return createSelector(
+    [
+      (state, { org_id }) => state.getIn(['organizations', org_id]),
+      (state, { org_id }) => state.getIn(['organizations', org_id, 'members'])
+    ],
+    (organization, members) => {
+      if (!organization) return null;
+      
+      return organization.set('members', members);
+    }
+  );
+};
+
+export const getJob = createSelector(
+  [(state, { job_id }) => state.getIn(['jobs', job_id])],
+  (job) => job
+);
+
+export const makeGetJob = () => {
+  return createSelector(
+    [
+      (state, { job_id }) => state.getIn(['jobs', job_id]),
+      (state, { job_id }) => state.getIn(['organizations', state.getIn(['jobs', job_id, 'organization'])]),
+      (state, { job_id }) => state.getIn(['accounts', state.getIn(['jobs', job_id, 'user'])])
+    ],
+    (job, organization, user) => {
+      if (!job) return null;
+      
+      return job.withMutations(map => {
+        if (organization) {
+          map.set('organization', organization);
+        }
+        if (user) {
+          map.set('user', user);
+        }
+      });
+    }
+  );
+};
+
+export const getJobsList = createSelector([
+  (state, type) => state.getIn(['job_lists', type, 'items']),
+], (items) => items.toList());
+
+export const getSavedJobs = createSelector([
+  (state) => state.getIn(['jobs']),
+], (jobs) => {
+  return jobs.filter(job => job.get('saved') === true).toList();
+});
+
+export const getJobsByOrganization = createSelector(
+  [
+    (state, { org_id }) => state.getIn(['jobs']),
+    (state, { org_id }) => org_id
+  ],
+  (jobs, orgId) => {
+    return jobs.filter(job => 
+      job.get('organization') === orgId
+    ).toList();
+  }
+);
+
+export const getFilteredJobs = createSelector(
+  [
+    (state) => state.getIn(['jobs']),
+    (_, { filters }) => filters
+  ],
+  (jobs, filters) => {
+    if (!filters) return jobs.toList();
+
+    return jobs.filter(job => {
+      const matchesJobType = !filters.job_type || job.get('job_type') === filters.job_type;
+      const matchesLocation = !filters.location || job.get('location') === filters.location;
+      const matchesCategory = !filters.job_category || job.get('job_category') === filters.job_category;
+      
+      return matchesJobType && matchesLocation && matchesCategory;
+    }).toList();
+  }
+);
