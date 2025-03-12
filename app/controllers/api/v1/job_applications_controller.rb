@@ -77,6 +77,11 @@ class Api::V1::JobApplicationsController < Api::BaseController
   end
 
   def destroy
+    unless current_user.organization_id == @application.job.organization_id
+      render json: { error: I18n.t('job_applications.errors.not_authorized') }, status: :forbidden
+      return
+    end
+
     if @application.destroy
       render json: { success: true }, status: 200
     else
