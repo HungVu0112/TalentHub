@@ -143,4 +143,84 @@ export function importFetchedOrganizations(organizations) {
   };
 }
 
+export function importFetchedJob(job) {
+  return (dispatch) => {
+    // Import job
+    dispatch(importJob(job));
 
+    // Import organization of the job
+    if (job.organization) {
+      dispatch(importOrganizations([job.organization]));
+    }
+
+    // Import user who posted the job
+    if (job.user) {
+      dispatch(importAccounts({ accounts: [job.user] }));
+    }
+  };
+}
+
+export function importFetchedJobs(jobs) {
+  return (dispatch) => {
+    // Import multiple jobs
+    dispatch(importJobs(jobs));
+
+    // Collect and import organizations
+    const organizations = jobs
+      .map(job => job.organization)
+      .filter(org => org);
+    if (organizations.length > 0) {
+      dispatch(importOrganizations(organizations));
+    }
+
+    // Collect and import users
+    const users = jobs
+      .map(job => job.user)
+      .filter(user => user);
+    if (users.length > 0) {
+      dispatch(importAccounts({ accounts: users }));
+    }
+  };
+}
+
+export function importFetchedJobApplication(application) {
+  return (dispatch) => {
+    // Import job application
+    dispatch(importJobApplication(application));
+
+    // Import job if available
+    if (application.job) {
+      dispatch(importJobs([application.job]));
+    }
+
+    // Import user who submitted the application
+    if (application.user) {
+      dispatch(importAccounts({ accounts: [application.user] }));
+    }
+  };
+}
+
+export function importFetchedJobApplications(applications) {
+  return (dispatch) => {
+    // Import multiple job applications
+    dispatch(importJobApplications(applications));
+
+    // Collect and import jobs
+    const jobs = applications
+      .map(app => app.job)
+      .filter(job => job);
+    
+    if (jobs.length > 0) {
+      dispatch(importJobs(jobs));
+    }
+
+    // Collect and import users (applicants)
+    const users = applications
+      .map(app => app.user)
+      .filter(user => user);
+    
+    if (users.length > 0) {
+      dispatch(importAccounts({ accounts: users }));
+    }
+  };
+}

@@ -188,6 +188,55 @@ export function normalizeJob(job, oldJob) {
     normalJob.requirementsHtml = oldJob.requirementsHtml;
   }
 
+  // Additional job-specific normalizations
+  normalJob.saved = job.saved || false;
+  normalJob.viewsCount = job.views_count || 0;
+  normalJob.applicationCount = job.application_count || 0;
+
+  return normalJob;
+}
+
+export function normalizeJobList(jobs) {
+  return jobs.map(job => normalizeJob(job));
+}
+
+export function normalizeJobApplication(application, oldApplication) {
+  const normalApplication = { ...application };
+  
+  // Set user and job as IDs
+  normalApplication.user = application.user.id;
+  normalApplication.job = application.job.id;
+  
+  // Process cover letter with emojis if it changed
+  if (!oldApplication || oldApplication.cover_letter !== normalApplication.cover_letter) {
+    const emojiMap = makeEmojiMap(normalApplication.emojis || []);
+    
+    normalApplication.coverLetterHtml = emojify(
+      escapeTextContentForBrowser(normalApplication.cover_letter || ''), 
+      emojiMap
+    );
+  } else {
+    // Reuse existing HTML if content hasn't changed
+    normalApplication.coverLetterHtml = oldApplication.coverLetterHtml;
+  }
+  
+  // Format resume file information
+  if (normalApplication.resume) {
+    normalApplication.resumeUrl = normalApplication.resume.url;
+    normalApplication.resumeFileName = normalApplication.resume.file_name;
+    normalApplication.resumeFileSize = normalApplication.resume.file_size;
+    normalApplication.resumeContentType = normalApplication.resume.content_type;
+  }
+  
+  // Additional normalizations
+  normalApplication.isPending = normalApplication.status === 'pending';
+  normalApplication.isReviewing = normalApplication.status === 'reviewing';
+  normalApplication.isInterviewed = normalApplication.status === 'interviewed';
+  normalApplication.isAccepted = normalApplication.status === 'accepted';
+  normalApplication.isRejected = normalApplication.status === 'rejected';
+  normalApplication.isWithdrawn = normalApplication.status === 'withdrawn';
+  
+  return normalApplication;
 }
 
 export function normalizeJobApplicationList(applications) {
