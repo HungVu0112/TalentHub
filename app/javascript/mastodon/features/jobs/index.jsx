@@ -15,15 +15,7 @@ import { withRouter } from 'react-router';
 import { useHistory } from 'react-router';
 
 const messages = defineMessages({
-    heading: { id: 'column.jobs', defaultMessage: 'Jobs' },
-    job_type: { id: "job.job_type", defaultMessage: "Job Type" },
-    job_category: { id: "job.job_category", defaultMessage: "Job Category" },
-    all_job: { id: "job.all", defaultMessage: "All" },
-    filter: { id: "job.filter", defaultMessage: "Filter" },
-    search_placeholder: { id: "job.search_placeholder", defaultMessage: "Search for jobs..."},
-    search: { id: "job.search", defaultMessage: "Search"},
-    empty: { id: 'organization.empty_jobs', defaultMessage: "There are no suitable jobs!"},
-    saved_jobs: { id: 'job.saved_jobs', defaultMessage: "Saved Jobs" },
+   
 });
 
 const Jobs = () => {
@@ -68,14 +60,6 @@ const Jobs = () => {
         }
     }, [reLoad, user_type, dispatch]) // Thêm dispatch vào dependency array
 
-    const handleInputChange = useCallback((e) => {
-        const { name, value } = e.target;
-        setFilterParams(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    }, []);
-
     const handleFilter = useCallback(() => {
         const { job_type, job_category, query } = filterParams;
 
@@ -96,13 +80,6 @@ const Jobs = () => {
         });
     }, [filterParams.job_type, filterParams.job_category, filterParams.query, dispatch]);
 
-    const getHumanJobType = (jobType) => {
-        // Thêm kiểm tra JOB_TYPES tồn tại
-        if (!JOB_TYPES || !Array.isArray(JOB_TYPES.value)) return jobType;
-        const index = JOB_TYPES.value.findIndex(type => type === jobType);
-        return index !== -1 && JOB_TYPES.human_value?.[index] ? JOB_TYPES.human_value[index] : jobType;
-    };
-
     const getHumanJobCategory = (jobCategory) => {
          // Thêm kiểm tra JOB_CATEGORIES tồn tại
         if (!Array.isArray(JOB_CATEGORIES)) return jobCategory;
@@ -115,20 +92,6 @@ const Jobs = () => {
             }
         }
         return jobCategory;
-    };
-
-    const handleSaveJob = async (id, e) => {
-        e.stopPropagation();
-
-        try {
-            const res = await dispatch(saveJob(id));
-            if (res) {
-                setSavedJobIds(prev => [...prev, id.toString()]);
-                setReLoad(n => n + 1);
-            }
-        } catch (error) {
-            console.error('Error saving job:', error);
-        }
     };
 
     const handleUnsaveJob = async (id, e) => {
@@ -162,15 +125,6 @@ const Jobs = () => {
             </Helmet>
             <div className='jobs-container'>
                 <div className='jobs-container__filter_tab'>
-                    <div className='dropdown'>
-                        <label htmlFor="job_type">{intl.formatMessage(messages.job_type)}:</label>
-                        <select data-testid="job-type-select" name="job_type" id="job_type" value={filterParams.job_type} onChange={handleInputChange} >
-                            <option value="all">{intl.formatMessage(messages.all_job)}</option>
-                            {JOB_TYPES.value.map((val, index) => (
-                                <option key={val} value={val}>{JOB_TYPES.human_value[index]}</option>
-                            ))}
-                        </select>
-                    </div>
                     <div className='dropdown'>
                         <label htmlFor="job_category">
                             {intl.formatMessage(messages.job_category)}:

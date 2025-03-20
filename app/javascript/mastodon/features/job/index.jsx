@@ -20,23 +20,7 @@ import { checkJobApplication, fetchJobApplicationsByJob } from 'mastodon/actions
 import ApplicationCard from 'mastodon/components/application_card';
 
 const messages = defineMessages({
-    description: { id: 'job.description', defaultMessage: 'Description' },
-    requirements: { id: 'job.requirements', defaultMessage: 'Requirements' },
-    contact_email: { id: 'job.contact_email', defaultMessage: 'Contact Email' },
-    deadline: { id: 'job.deadline', defaultMessage: 'Deadline'},
-    status: { id: 'job.status', defaultMessage: 'Status'},
-    views_count: { id: 'job.views_count', defaultMessage: 'Views Count' },
-    application_count: { id: 'job.application', defaultMessage: 'Application Count'},
-    apply: { id: 'job.apply', defaultMessage: 'Easy Apply'},
-    status_open: { id: 'job.status_open', defaultMessage: 'Opening'},
-    status_closed: { id: 'job.status_close', defaultMessage: 'Closed'},
-    close_job: { id: 'job.close_job', defaultMessage: 'Close Job' },
-    caution: { id: 'job.caution', defaultMessage: 'Please use edu email to continue' },
-    save_job: { id: 'job.save_job', defaultMessage: 'Save Job' },
-    unsave_job: { id: 'job.unsave_job', defaultMessage: 'Unsave Job' },
-    applied: { id: 'application.applied', defaultMessage: 'Applied' },
-    list: { id: 'application.list', defaultMessage: 'Application List'},
-    list_empty: { id: 'application.list_empty', defaultMessage: 'There are no applications'}
+    
 });
 
 const JobPage = () => {
@@ -89,57 +73,6 @@ const JobPage = () => {
             }
         }
     }, [jobData, reLoad]) // Thêm dependency reLoad nếu muốn fetch lại applications khi reload
-
-    const getApplications = async () => {
-        try {
-            const res = await dispatch(fetchJobApplicationsByJob(id));
-            if (res && res.length > 0) {
-                setApplicantList(res);
-            } else {
-                setApplicantList([]); // Đảm bảo reset nếu không có ứng viên
-            }
-        } catch (error) {
-            console.error('Error fetching applications:', error);
-        }
-    }
-
-    const checkAppilied = async () => {
-        try { // Thêm try...catch
-            const res = await dispatch(checkJobApplication(id));
-            if (res) {
-                if (res.applied) {
-                    setIsApplied(true);
-                    setApplyStatus(res.application_status);
-                } else {
-                    setIsApplied(false); // Reset nếu không applied
-                    setApplyStatus("");
-                }
-            }
-        } catch(error) {
-             console.error('Error checking application status:', error);
-        }
-    }
-
-    const getHumanJobType = (jobType) => {
-        // Kiểm tra JOB_TYPES và value tồn tại
-        if (!JOB_TYPES || !Array.isArray(JOB_TYPES.value)) return jobType;
-        const index = JOB_TYPES.value.findIndex(type => type === jobType);
-        return index !== -1 && JOB_TYPES.human_value?.[index] ? JOB_TYPES.human_value[index] : jobType;
-    };
-
-    const getHumanJobCategory = (jobCategory) => {
-         // Kiểm tra JOB_CATEGORIES tồn tại
-        if (!Array.isArray(JOB_CATEGORIES)) return jobCategory;
-        for (const category of JOB_CATEGORIES) {
-             // Kiểm tra category.value tồn tại
-            if (!category || !Array.isArray(category.value)) continue;
-            const index = category.value.findIndex(cat => cat === jobCategory);
-            if (index !== -1 && category.human_value?.[index]) {
-                return category.human_value[index];
-            }
-        }
-        return jobCategory;
-    };
 
     const handleOpenModal = () => {
         setOpenModal(true);
