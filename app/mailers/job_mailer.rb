@@ -66,6 +66,20 @@ class JobMailer < ApplicationMailer
     end
   end
 
+  def application_interview_notification(application)
+    @application = application
+    @job = application.job
+    @user_fake = application.user
+    @user = @user_fake&.account
+
+    locale_for_account(@user) do
+      mail(
+        to: @user_fake.email,
+        subject: default_i18n_subject(job_title: @job.title, instance: @instance)
+      )
+    end
+  end
+
   private
 
   def set_instance
