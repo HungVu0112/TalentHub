@@ -22,7 +22,6 @@ export const JOB_TYPES = {
     ]
 }
 
-// Job Categories
 export const JOB_CATEGORIES = [
     {
         key:  'Technology',
