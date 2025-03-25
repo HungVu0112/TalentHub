@@ -13,20 +13,6 @@ import { useHistory } from 'react-router';
 import { withRouter } from 'react-router';
 
 const messages = defineMessages({
-    heading: { id: "organization.create_job_heading", defaultMessage: "Create Job" },
-    title: { id: "job.title", defaultMessage: "Title" },
-    description: { id: "job.description", defaultMessage: "Description" },
-    requirements: { id: "job.requirements", defaultMessage: "Requirements" },
-    location: { id: "job.location", defaultMessage: "Location" },
-    salary_range: { id: "job.salary_range", defaultMessage: "Salary Range" },
-    job_type: { id: "job.job_type", defaultMessage: "Job Type" },
-    job_category: { id: "job.job_category", defaultMessage: "Job Category" },
-    contact_email: { id: "job.contact_email", defaultMessage: "Contact Email" },
-    deadline: { id: "job.deadline", defaultMessage: "Deadline" },
-    submit: { id: "job.submit", defaultMessage: "Submit" },
-    empty_fields: { id: "job.empty_fields", defaultMessage: "You should fill all the empty fields!" },
-    success_create: {  id: "job.success_create", defaultMessage: "Successfully created!"},
-    error_create: { id:  "job.error_create", defaultMessage: "Error creating job!"}
 });
 
 const CreateJobPage = () => {
@@ -117,31 +103,6 @@ const CreateJobPage = () => {
                     />
                 </div>
 
-                <div className='create-job-container__quill_input mt-20'>
-                    <label htmlFor='description'>
-                        {intl.formatMessage(messages.description)}
-                    </label>
-                    <Editor
-                        id="description"
-                        value={jobData.description}
-                        onChange={(content) => handleEditorChange('description', content)}
-                        placeholder="Mô tả chi tiết công việc"
-                    />
-                </div>
-
-                <div className='create-job-container__quill_input mt-20'>
-                    <label htmlFor='requirements'>
-                        {intl.formatMessage(messages.requirements)}
-                    </label>
-                    <Editor
-                        id="requirements"
-                        value={jobData.requirements}
-                        onChange={(content) => handleEditorChange('requirements', content)}
-                        placeholder="Yêu cầu công việc"
-                        required
-                    />
-                </div>
-
                 <div className='create-job-container__group_3_input mt-20'>
                     <div className='dropdown flex-direction-column'>
                         <label htmlFor="job_type">
@@ -153,25 +114,6 @@ const CreateJobPage = () => {
                                     <option value={val}>{JOB_TYPES.human_value[index]}</option>
                                 )
                             })}        
-                        </select>
-                    </div>
-
-                    <div className='dropdown flex-direction-column'>
-                        <label htmlFor="job_category">
-                            {intl.formatMessage(messages.job_category)}
-                        </label>
-                        <select name="job_category" id="job_category" value={jobData.job_category} onChange={handleInputChange}>
-                            {JOB_CATEGORIES.map((jobCat) => {
-                                return (
-                                    <optgroup label={jobCat.key}>
-                                        {jobCat.value.map((val, index) => {
-                                            return (
-                                                <option value={val}>{jobCat.human_value[index]}</option>
-                                            )
-                                        })}
-                                    </optgroup>
-                                )
-                            })}   
                         </select>
                     </div>
                     
@@ -202,20 +144,6 @@ const CreateJobPage = () => {
                         />
                     </div>
 
-                    <div className='input_item flex-direction-column'>
-                        <label htmlFor='salary_range'>
-                            {intl.formatMessage(messages.salary_range)}
-                        </label>
-                        <input 
-                            type="text"
-                            id='salary_range'
-                            name='salary_range'
-                            value={jobData.salary_range}
-                            onChange={handleInputChange}
-                            placeholder="Nhập khoảng lương mong muốn"
-                            required
-                        />
-                    </div>
                 </div>
 
                 <div className='flex-direction-column mt-20'>
