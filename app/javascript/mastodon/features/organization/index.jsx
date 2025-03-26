@@ -1,224 +1,296 @@
-import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
-import { useParams, useHistory } from 'react-router-dom'; 
-import { defineMessages, FormattedMessage, useIntl } from 'react-intl';
-import { useDispatch, useSelector } from 'react-redux';
-import PropTypes from 'prop-types'; 
-
 import Column from 'mastodon/features/ui/components/column';
+import ImmutablePureComponent from "react-immutable-pure-component";
 import { ColumnBackButton } from 'mastodon/components/column_back_button';
+import { withRouter } from 'react-router';
+import { defineMessages, FormattedMessage, injectIntl } from 'react-intl';
 import ScrollableList from 'mastodon/components/scrollable_list';
+import PropTypes from 'prop-types';
 import { OrganizationHeader } from './components/organization_header';
 import JobCard from 'mastodon/components/job_card';
-import { fetchJobsByOrganization, fetchSavedJobs, saveJob, unsaveJob, updateJob } from 'mastodon/actions/jobs';
+import { fetchJobsByOrganization, fetchSavedJobs, saveJob, unsaveJob, updateJob } from 'mastodon/actions/jobs'; 
+import { Map as ImmutableMap, List as ImmutableList } from 'immutable';
 import { showAlert, showAlertForError } from 'mastodon/actions/alerts';
+import { connect } from 'react-redux';
 import { JOB_TYPES, JOB_CATEGORIES } from '../create_job/constants';
-import { IdentityContext } from 'mastodon/identity_context'; 
+import { identityContextPropShape } from 'mastodon/identity_context';
+import { withIdentity } from 'mastodon/identity_context';
 
 const messages = defineMessages({
     job_update_success: { id: 'job.success_update', defaultMessage: 'Job updated successfully!' },
     job_update_error: { id: 'job.error_update', defaultMessage: 'Error updating job!' },
-    empty_jobs: { id: 'organization.empty_jobs', defaultMessage: 'There aren’t any jobs yet!' },
-    error_fetching_jobs: { id: 'organization.error_fetching_jobs', defaultMessage: 'Error fetching jobs.' },
-    error_fetching_saved_jobs: { id: 'organization.error_fetching_saved_jobs', defaultMessage: 'Error fetching saved jobs.' },
-    error_saving_job: { id: 'organization.error_saving_job', defaultMessage: 'Error saving job.' },
-    error_unsaving_job: { id: 'organization.error_unsaving_job', defaultMessage: 'Error unsaving job.' },
+})
+
+const mapStateToProps = state => ({
+    savedJobs: state.getIn(['jobs', 'savedJobLists', 'items'], ImmutableList())
 });
 
-const OrganizationPage = () => {
-    const intl = useIntl();
-    const dispatch = useDispatch();
-    const history = useHistory();
-    const { id: organizationIdFromParams } = useParams(); 
-    const identity = useContext(IdentityContext);
-    const [jobs, setJobs] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [hasMore, setHasMore] = useState(true);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [localSavedJobIds, setLocalSavedJobIds] = useState(new Set());
+class Organization extends ImmutablePureComponent {
+    static propTypes = {
+        intl: PropTypes.object.isRequired,
+        match: PropTypes.object.isRequired,
+        history: PropTypes.object.isRequired,
+        dispatch: PropTypes.func.isRequired,
+        identity: identityContextPropShape,
+        savedJobs: PropTypes.instanceOf(ImmutableList)
+    }
 
-    const savedJobsFromStore = useSelector(state => {
+    state = {
+        jobs: ImmutableList(),
+        isLoading: true,
+        hasMore: true,
+        page: 1,
+        savedJobIds: new Set()
+    }
 
-        const items = state.getIn(['jobs', 'savedJobLists', 'items']);
-        return items ? (typeof items.toJS === 'function' ? items.toJS() : items) : [];
-    });
+    componentDidMount() {
+        const { dispatch, match, identity } = this.props;
+        const { id } = match.params;
+        const { user_type } = identity;
+        
+        if (id) {
+            this.fetchJobs(id);
+        }
 
-    const storeSavedJobIds = useMemo(() => {
-        return new Set(savedJobsFromStore.map(job => job.id ? job.id.toString() : job.toString()));
-    }, [savedJobsFromStore]);
+        // If the user is a student, fetch their saved jobs to know which jobs are saved
+        if (user_type === 'student') {
+            this.fetchSavedJobs();
+        }
+    }
 
-    const combinedSavedJobIds = useMemo(() => {
-        const combined = new Set([...storeSavedJobIds, ...localSavedJobIds]);
-        return combined;
-    }, [storeSavedJobIds, localSavedJobIds]);
+    componentDidUpdate(prevProps) {
+        const { match, savedJobs } = this.props;
+        const { id } = match.params;
+        const prevId = prevProps.match.params.id;
+        
+        // If organization ID changed, reset state and fetch new jobs
+        if (id !== prevId) {
+            this.setState({ jobs: ImmutableList(), isLoading: true, hasMore: true, page: 1 }, () => {
+                this.fetchJobs(id);
+            });
+        }
 
+        // If savedJobs list changed, update the savedJobIds Set
+        if (savedJobs !== prevProps.savedJobs) {
+            this.updateSavedJobsSet(savedJobs);
+        }
+    }
 
-    const loadJobs = useCallback(async (orgId, page = 1) => {
-        setIsLoading(true);
-        try {
-
-            const response = await dispatch(fetchJobsByOrganization(orgId, page)); 
-            setJobs(prevJobs => page === 1 ? response.data : [...prevJobs, ...response.data]); 
-            setHasMore(response.data.length === 20); 
-            setCurrentPage(page);
-        } catch (error) {
-            dispatch(showAlertForError({ error: intl.formatMessage(messages.error_fetching_jobs) }));
+    fetchJobs = (organization_id) => {
+        const { dispatch } = this.props;
+        
+        this.setState({ isLoading: true });
+        
+        dispatch(fetchJobsByOrganization(organization_id)).then(response => {
+            this.setState(prevState => ({
+                jobs: ImmutableList(response),
+                isLoading: false,
+                hasMore: response.length === 20,
+            }));
+        }).catch(error => {
+            this.setState({ isLoading: false });
             console.error('Error fetching jobs:', error);
-            setHasMore(false);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [dispatch, intl]);
-    const loadSavedJobsForStudent = useCallback(async () => {
-        try {
-            await dispatch(fetchSavedJobs());
-        } catch (error) {
-            dispatch(showAlertForError({ error: intl.formatMessage(messages.error_fetching_saved_jobs) }));
+        });
+    }
+
+    fetchSavedJobs = () => {
+        const { dispatch } = this.props;
+        
+        dispatch(fetchSavedJobs()).then(() => {
+            this.updateSavedJobsSet(this.props.savedJobs);
+        }).catch(error => {
             console.error('Error fetching saved jobs:', error);
+        });
+    }
+
+    updateSavedJobsSet = (savedJobs) => {
+        if (savedJobs && savedJobs.size > 0) {
+            const savedJobIds = new Set(savedJobs.map(id => id.toString()));
+            this.setState({ savedJobIds });
         }
-    }, [dispatch, intl]);
+    }
 
-    useEffect(() => {
-        if (organizationIdFromParams) {
-            setJobs([]);
-            setCurrentPage(1);
-            setHasMore(true);
-            loadJobs(organizationIdFromParams, 1);
-        }
-        if (identity?.user_type === 'student') {
-            loadSavedJobsForStudent();
-        }
-    }, [organizationIdFromParams, identity?.user_type, loadJobs, loadSavedJobsForStudent]);
+    isJobSaved = (jobId) => {
+        return this.state.savedJobIds.has(jobId.toString());
+    }
 
-
-    const isJobSaved = useCallback((jobId) => {
-        return combinedSavedJobIds.has(jobId.toString());
-    }, [combinedSavedJobIds]);
-
-    const handleCloseJob = useCallback(async (jobId, e) => {
+    handleCloseJob = (jobId, e) => {
         e.stopPropagation();
-        try {
-            await dispatch(updateJob(jobId, { status: "closed" }));
-            dispatch(showAlert({ message: intl.formatMessage(messages.job_update_success) }));
 
-            if (organizationIdFromParams) {
-                 loadJobs(organizationIdFromParams, 1);
-            }
+        const { dispatch, intl, match } = this.props;
+        const { id } = match.params;
+        const status = "closed";
+
+        try {
+            dispatch(updateJob(jobId, { status })).then(res => {
+                if (res) {
+                    dispatch(showAlert({
+                        message: intl.formatMessage(messages.job_update_success)
+                    }))
+                    this.setState({ jobs: ImmutableList() }, () => {
+                        this.fetchJobs(id);
+                    });
+                }
+            }).catch(error => {
+                dispatch(showAlertForError({
+                    error: intl.formatMessage(messages.job_update_error)
+                }))
+            });
         } catch (error) {
-            dispatch(showAlertForError({ error: intl.formatMessage(messages.job_update_error) }));
+            dispatch(showAlertForError({
+                error: intl.formatMessage(messages.job_update_error)
+            }))
         }
-    }, [dispatch, intl, organizationIdFromParams, loadJobs]);
+    }
 
-    const handleSaveJob = useCallback(async (jobId, e) => {
+    handleSaveJob = (jobId, e) => { 
         e.stopPropagation();
-        try {
-            await dispatch(saveJob(jobId));
-            setLocalSavedJobIds(prev => new Set(prev).add(jobId.toString())); 
 
+        const { dispatch, intl, match } = this.props;
+        const { id } = match.params;
+
+        try {
+            dispatch(saveJob(jobId)).then(res => {
+                if (res) {
+                    // Update local state to reflect the change immediately
+                    this.setState(prevState => {
+                        const updatedSavedJobIds = new Set(prevState.savedJobIds);
+                        updatedSavedJobIds.add(jobId.toString());
+                        return { savedJobIds: updatedSavedJobIds };
+                    });
+                    
+                    // Refresh saved jobs list
+                    this.fetchSavedJobs();
+                }
+            }).catch(error => {
+                console.error('Error saving job:', error);
+                dispatch(showAlertForError({
+                    error: error.response ? error.response.data.error : error.message
+                }));
+            });
         } catch (error) {
-            dispatch(showAlertForError({ error: intl.formatMessage(messages.error_saving_job) }));
             console.error('Error saving job:', error);
+            dispatch(showAlertForError({
+                error: error.message
+            }));
         }
-    }, [dispatch, intl]);
+    }
 
-    const handleUnsaveJob = useCallback(async (jobId, e) => {
+    handleUnsaveJob = (jobId, e) => {
         e.stopPropagation();
+
+        const { dispatch, intl, match } = this.props;
+        const { id } = match.params;
+
         try {
-            await dispatch(unsaveJob(jobId));
-            setLocalSavedJobIds(prev => {
-                const updated = new Set(prev);
-                updated.delete(jobId.toString());
-                return updated;
-            }); 
+            dispatch(unsaveJob(jobId)).then(res => {
+                if (res) {
+                   // Update local state to reflect the change immediately
+                    this.setState(prevState => {
+                        const updatedSavedJobIds = new Set(prevState.savedJobIds);
+                        updatedSavedJobIds.delete(jobId.toString());
+                        return { savedJobIds: updatedSavedJobIds };
+                    });
+                    
+                    // Refresh saved jobs list
+                    this.fetchSavedJobs();
+                }
+            }).catch(error => {
+                console.error('Error unsaving job:', error);
+                dispatch(showAlertForError({
+                    error: error.response ? error.response.data.error : error.message
+                }));
+            });
         } catch (error) {
-            dispatch(showAlertForError({ error: intl.formatMessage(messages.error_unsaving_job) }));
             console.error('Error unsaving job:', error);
+            dispatch(showAlertForError({
+                error: error.message
+            }));
         }
-    }, [dispatch, intl]);
+    }
 
-    const handleLoadMore = useCallback(() => {
-        if (organizationIdFromParams && !isLoading && hasMore) {
-            loadJobs(organizationIdFromParams, currentPage + 1);
+    handleLoadMore = () => {
+        const { match } = this.props;
+        const { id } = match.params;
+        
+        if (id && !this.state.isLoading && this.state.hasMore) {
+            this.fetchJobs(id);
         }
-    }, [organizationIdFromParams, isLoading, hasMore, currentPage, loadJobs]);
+    }
 
-    const getHumanReadableValue = useCallback((value, typeConstant) => {
-        const index = typeConstant.value.findIndex(v => v === value);
-        return index !== -1 ? typeConstant.human_value[index] : value;
-    }, []);
-    
-    const getHumanJobType = useCallback((jobType) => {
-        return getHumanReadableValue(jobType, JOB_TYPES);
-    }, [getHumanReadableValue]);
+    getHumanJobType = (jobType) => {
+        const index = JOB_TYPES.value.findIndex(type => type === jobType);
+        return index !== -1 ? JOB_TYPES.human_value[index] : jobType;
+    };
 
-    const getHumanJobCategory = useCallback((jobCategoryValue) => {
+    getHumanJobCategory = (jobCategory) => {
         for (const category of JOB_CATEGORIES) {
-            const index = category.value.findIndex(cat => cat === jobCategoryValue);
+            const index = category.value.findIndex(cat => cat === jobCategory);
             if (index !== -1) {
                 return category.human_value[index];
             }
         }
-        return jobCategoryValue;
-    }, []);
+        return jobCategory;
+    };
+      
+    render() {
+        const { intl, match, identity, history } = this.props;
+        const { id } = match.params;
+        const { jobs, isLoading, hasMore } = this.state;
+        const { user_type, organization_id } = identity;
 
+        let emptyMessage = <FormattedMessage
+            id='organization.empty_jobs'
+            defaultMessage='There arent any jobs yet!'
+        />
+        
+        return (
+            <Column>
+                <ColumnBackButton />
 
-    if (!identity) { // Hoặc một kiểm tra loading khác cho identity nếu cần
-        return <Column><FormattedMessage id="loading" defaultMessage="Loading..." /></Column>;
+                <ScrollableList
+                    className='organization-container'
+                    prepend={
+                        id && (
+                            <OrganizationHeader org_id={id} />
+                        )
+                    }
+                    scrollKey='organization-jobs'
+                    alwaysPrepend
+                    isLoading={isLoading}
+                    hasMore={hasMore}
+                    onLoadMore={this.handleLoadMore}
+                    emptyMessage={emptyMessage}
+                    bindToDocument={false}
+                >
+                    {jobs.map(job => (
+                        <JobCard 
+                            key={job.id}
+                            jobData={{
+                                id: job.id,
+                                title: job.title,
+                                organization_name: job.organization.name,
+                                organization_logo: job.organization.avatar,
+                                location: job.location,
+                                salary_range: job.salary_range,
+                                job_type: this.getHumanJobType(job.job_type),
+                                job_category: this.getHumanJobCategory(job.job_category),
+                                status: job.status,
+                            }}
+                            isStaff={user_type === 'organization' && organization_id.toString() === id}
+                            isOrganizationType={user_type === 'organization'}
+                            isStudent={user_type === "student"}
+                            isSaved={this.isJobSaved(job.id)}
+                            handleCloseJob={this.handleCloseJob}
+                            handleSaveJob={this.handleSaveJob}
+                            handleUnsaveJob={this.handleUnsaveJob}
+                            intl={intl}
+                            history={history}
+                        />
+                    ))}
+                </ScrollableList>
+            </Column>
+        )
     }
-    
-    const { user_type, organization_id: userOrganizationId } = identity;
+}
 
-    return (
-        <Column>
-            <ColumnBackButton />
-            <ScrollableList
-                className='organization-container'
-                prepend={
-                    organizationIdFromParams && (
-                        <OrganizationHeader org_id={organizationIdFromParams} />
-                    )
-                }
-                scrollKey={`organization-jobs-${organizationIdFromParams}`} // Thêm ID để key thay đổi khi org thay đổi
-                alwaysPrepend
-                isLoading={isLoading && currentPage === 1} // Chỉ hiển thị loading chính khi tải trang đầu
-                hasMore={hasMore}
-                onLoadMore={handleLoadMore}
-                emptyMessage={<FormattedMessage {...messages.empty_jobs} />}
-                bindToDocument={false} // Giữ lại prop này
-            >
-                {jobs.map(job => (
-                    <JobCard
-                        key={job.id}
-                        jobData={{
-                            id: job.id,
-                            title: job.title,
-                            organization_name: job.organization?.name, // Thêm optional chaining
-                            organization_logo: job.organization?.avatar,
-                            location: job.location,
-                            salary_range: job.salary_range,
-                            job_type: getHumanJobType(job.job_type),
-                            job_category: getHumanJobCategory(job.job_category),
-                            status: job.status,
-                        }}
-                        // Điều kiện hiển thị dựa trên user_type và ID tổ chức
-                        isStaff={user_type === 'organization' && userOrganizationId?.toString() === organizationIdFromParams}
-                        isOrganizationType={user_type === 'organization'}
-                        isStudent={user_type === 'student'}
-                        isSaved={isJobSaved(job.id)}
-                        handleCloseJob={handleCloseJob}
-                        handleSaveJob={handleSaveJob}
-                        handleUnsaveJob={handleUnsaveJob}
-                        intl={intl} 
-                        history={history} 
-                    />
-                ))}
-                {/* Hiển thị loading cho các trang sau */}
-                {isLoading && currentPage > 1 && <div style={{ textAlign: 'center', padding: '20px' }}><FormattedMessage id="loading_more" defaultMessage="Loading more..." /></div>}
-            </ScrollableList>
-        </Column>
-    );
-};
-
-OrganizationPage.propTypes = {
-};
-
-export default OrganizationPage;
+export default connect(mapStateToProps)(injectIntl(withRouter(withIdentity(Organization))));
